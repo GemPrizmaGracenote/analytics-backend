@@ -1,3 +1,8 @@
+# Editor cruft
+\#*\#
+*.swp
+*~
+
 # Logs
 logs
 *.log
