@@ -1,0 +1,27 @@
+{
+  "name": "analytics-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fem-inc/analytics-backend.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/fem-inc/analytics-backend/issues"
+  },
+  "homepage": "https://github.com/fem-inc/analytics-backend#readme",
+  "dependencies": {
+    "aws-sdk": "^2.2.15",
+    "bluebird": "^3.0.5",
+    "lodash": "^3.10.1"
+  },
+  "devDependencies": {
+    "mocha": "^2.3.3"
+  }
+}

@@ -1,10 +1,12 @@
 var AWS = require('aws-sdk');
 var fs = require('fs');
+var Promise = require('bluebird');
 
 AWS.config.update({region: 'us-east-1'});
 var config = JSON.parse(fs.readFileSync('config.json'));
 var KEY_DELIM = '|';
 var docClient = new AWS.DynamoDB.DocumentClient();
+Promise.promisifyAll(docClient);
 
 var DEFAULT_PERIOD = {
   name: 'hourly',
@@ -14,12 +16,12 @@ var DEFAULT_PERIOD = {
 exports.handler = function(event, context) {
   var timestamp = new Date().getTime();
   var bucket = timestamp - (timestamp % DEFAULT_PERIOD.modulus);
-  config.breakdowns.forEach(function(breakdown) {
+  Promise.all(config.breakdowns.map(function(breakdown) {
     var key = breakdown.dimensions.map(function(dimension) {
       return event[dimension];
     }).join(KEY_DELIM);
 
-    docClient.update({
+    return docClient.updateAsync({
       TableName: breakdown.name + '_' + DEFAULT_PERIOD.name, // TODO(ted): Make this configurable
       Key: {
         key: key,
@@ -33,13 +35,9 @@ exports.handler = function(event, context) {
         ':zero': 0,
         ':one': 1
       }
-    }, function(error) {
-      if (error) {
-        console.log(error.message);
-        context.fail(error.message);
-      } else {
-        context.succeed();
-      }
-    });
+    })
+  })).then(context.succeed.bind(context), function(error) {
+    console.log(error.message);
+    context.fail(error.message);
   });
 }
