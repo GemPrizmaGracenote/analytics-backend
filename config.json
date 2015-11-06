@@ -1,6 +1,15 @@
 {
   "breakdowns": [
-    {"name": "video_performance", "dimensions": ["video_id", "unit_domain"]}
+    {"name": "video_performance", "dimensions": ["video_id", "unit_domain"]},
+    {
+      "name": "publisher_metrics",
+      "dimensions": [
+        "unit_environment",
+        "unit_pbid",
+        "unit_domain",
+        "user_agent_device"
+      ]
+    }
   ],
   "extra_aggregations": [
     {"property": "unit_video_list.length", "name": "total_impressions"}
