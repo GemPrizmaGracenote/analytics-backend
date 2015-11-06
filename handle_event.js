@@ -45,9 +45,13 @@ exports.handler = function(event, context) {
   var timestamp = new Date().getTime();
   var bucket = timestamp - (timestamp % DEFAULT_PERIOD.modulus);
   Promise.all(config.breakdowns.map(function(breakdown) {
-    var key = breakdown.dimensions.map(function(dimension) {
+    var keyParts = breakdown.dimensions.map(function(dimension) {
       return event[dimension];
-    }).join(KEY_DELIM);
+    });
+    if !_.all(keyParts) {
+      return true;
+    }
+    var key = keyParts.join(KEY_DELIM);
     var aggregationParams = buildExtraAggregationParams(config.extra_aggregations, event);
 
     return docClient.updateAsync({
