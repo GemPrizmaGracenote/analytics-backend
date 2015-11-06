@@ -48,7 +48,7 @@ exports.handler = function(event, context) {
     var keyParts = breakdown.dimensions.map(function(dimension) {
       return event[dimension];
     });
-    if !_.all(keyParts) {
+    if (!_.all(keyParts)) {
       return true;
     }
     var key = keyParts.join(KEY_DELIM);
