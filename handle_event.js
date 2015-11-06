@@ -24,6 +24,9 @@ function buildExtraAggregationParams(aggregations, event) {
   var updateExpression = [''];
   aggregations.forEach(function(agg, i) {
     var value = _.get(event, agg.property);
+    if (!_.isNumber(value)) {
+      return;
+    }
     var sym = 'a' + i;
     var attrName = '#' + sym;
     var attrValue = ':' + sym;
