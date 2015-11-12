@@ -2,76 +2,65 @@ var AWS = require('aws-sdk');
 var fs = require('fs');
 var Promise = require('bluebird');
 var _ = require('lodash');
+var common = require('./common');
 
 AWS.config.update({region: 'us-east-1'});
 var config = JSON.parse(fs.readFileSync('config.json'));
-var KEY_DELIM = '|';
 var docClient = new AWS.DynamoDB.DocumentClient();
 Promise.promisifyAll(docClient);
 
-var DEFAULT_PERIOD = {
-  name: 'hourly',
-  modulus: 60*60*1000 // ms
-};
+var KEY_DELIM = common.KEY_DELIM;
+var DEFAULT_PERIOD = common.DEFAULT_PERIOD;
 
-function incrementExpression(name, incr) {
-  return name + ' = if_not_exists(' + name + ', :zero) + ' + incr;
+function colIncrementParams(breakdown, timestamp, rowKey, colKey, incrAmt) {
+  return {
+    TableName: breakdown.name + '_' + DEFAULT_PERIOD.name, // TODO(ted): Make this configurable
+    Key: {
+      key: rowKey,
+      timestamp: timestamp
+    },
+    UpdateExpression: 'SET #col_key = if_not_exists(#col_key, :zero) + :amt',
+    ExpressionAttributeNames: {'#col_key': colKey},
+    ExpressionAttributeValues: {
+      ':zero': 0,
+      ':amt': incrAmt
+    }
+  }
 }
 
-function buildExtraAggregationParams(aggregations, event) {
-  var expressionAttributeNames = {};
-  var expressionAttributeValues = {};
-  var updateExpression = [''];
-  aggregations.forEach(function(agg, i) {
-    var value = _.get(event, agg.property);
-    if (!_.isNumber(value)) {
-      return;
-    }
-    var sym = 'a' + i;
-    var attrName = '#' + sym;
-    var attrValue = ':' + sym;
-    expressionAttributeNames[attrName] = event.event_name + '_' + agg.name;
-    expressionAttributeValues[attrValue] = value;
-    updateExpression.push(incrementExpression(attrName, attrValue));
-  });
-  return {
-    ExpressionAttributeNames: expressionAttributeNames,
-    ExpressionAttributeValues: expressionAttributeValues,
-    UpdateExpression: updateExpression.join(', ')
-  };
+var NULL_FILTER = {
+  name: 'all',
+  properties: []
 }
 
 exports.handler = function(event, context) {
   var timestamp = new Date().getTime();
   var bucket = timestamp - (timestamp % DEFAULT_PERIOD.modulus);
-  Promise.all(config.breakdowns.map(function(breakdown) {
-    var keyParts = breakdown.dimensions.map(function(dimension) {
-      return event[dimension];
+  var writes = [];
+  config.breakdowns.forEach(function(breakdown) {
+    var dimensions = breakdown.dimensions.concat(['event_name']);
+    _.get(breakdown, 'filters', [NULL_FILTER]).forEach(function(filter) {
+      var rowKey = common.buildRowKey(event, dimensions, filter.name, 'count');
+      var colKey = common.buildColKey(event, filter.properties);
+      if (!(rowKey && colKey)) {
+        return;
+      }
+      writes.push(colIncrementParams(breakdown, bucket, rowKey, colKey, 1));
+      config.extra_aggregations.forEach(function(agg) {
+        var rowKey = common.buildRowKey(event, dimensions, filter.name, agg.name);
+        var value = _.get(event, agg.property);
+        if (rowKey && value) {
+          var params = colIncrementParams(breakdown, bucket, rowKey, colKey, value);
+          writes.push(params);
+        }
+      });
     });
-    if (!_.all(keyParts)) {
-      return true;
-    }
-    var key = keyParts.join(KEY_DELIM);
-    var aggregationParams = buildExtraAggregationParams(config.extra_aggregations, event);
-
-    return docClient.updateAsync({
-      TableName: breakdown.name + '_' + DEFAULT_PERIOD.name, // TODO(ted): Make this configurable
-      Key: {
-        key: key,
-        timestamp: bucket
-      },
-      UpdateExpression: 'SET ' + incrementExpression('#event_count', ':one') +
-          aggregationParams.UpdateExpression,
-      ExpressionAttributeNames: _.assign({
-        '#event_count': event.event_name + '_count',
-      }, aggregationParams.ExpressionAttributeNames),
-      ExpressionAttributeValues: _.assign({
-        ':zero': 0,
-        ':one': 1
-      }, aggregationParams.ExpressionAttributeValues)
-    })
-  })).then(context.succeed.bind(context), function(error) {
-    console.log(error.message);
-    context.fail(error.message);
   });
+  console.log('Writing %d rows', writes.length);
+  Promise.all(writes.map(function(write) {
+    return docClient.updateAsync(write);
+  })).then(context.succeed.bind(context), function(error) {
+    console.error(error.message);
+    context.fail(error.message);
+  }).catch(context.fail);
 }

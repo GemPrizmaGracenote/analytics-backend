@@ -6,8 +6,11 @@
       "dimensions": [
         "unit_environment",
         "unit_pbid",
-        "unit_domain",
-        "user_agent_device"
+        "unit_domain"
+      ],
+      "filters": [
+        {"name": "geo", "properties": ["ip_geo_info.country"]},
+        {"name": "device_layout", "properties": ["user_agent_device", "unit_layout"]}
       ]
     }
   ],
