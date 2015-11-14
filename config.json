@@ -22,7 +22,8 @@
         {"name": "geo", "properties": ["ip_geo_info.country"]},
         {"name": "device_layout", "properties": ["user_agent_device", "unit_layout"]},
         {"name": "synd", "properties": ["video_cpid"]},
-        {"name": "pub", "properties": ["unit_domain", "unit_pbid"]}
+        {"name": "pub", "properties": ["unit_domain", "unit_pbid"]},
+        {"name": "retention", "properties": ["video_progress_counter"]}
       ]
     },
     {
@@ -32,8 +33,9 @@
         "video_cpid"
       ],
       "filters": [
-        {"name": "geo", "properties": ["unit_domain", "ip_geo_info.country"]},
-        {"name": "device_layout", "properties": ["unit_domain", "user_agent_device", "unit_layout"]},
+        {"name": "geo", "properties": ["unit_pbid", "ip_geo_info.country"]},
+        {"name": "device_layout", "properties": ["unit_pbid", "user_agent_device", "unit_layout"]},
+        {"name": "retention", "properties": ["video_progress_counter"]},
         {"name": "publisher", "properties": ["unit_domain", "unit_pbid"]}
       ]
     }
