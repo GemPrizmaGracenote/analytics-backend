@@ -5,12 +5,36 @@
       "name": "publisher_metrics",
       "dimensions": [
         "unit_environment",
-        "unit_pbid",
-        "unit_domain"
+        "unit_pbid"
+      ],
+      "filters": [
+        {"name": "geo", "properties": ["unit_domain", "ip_geo_info.country"]},
+        {"name": "device_layout", "properties": ["unit_domain", "user_agent_device", "unit_layout"]},
+        {"name": "synd", "properties": ["unit_domain", "video_cpid"]}
+      ]
+    },
+    {
+      "name": "publisher_metrics_global",
+      "dimensions": [
+        "unit_environment"
       ],
       "filters": [
         {"name": "geo", "properties": ["ip_geo_info.country"]},
-        {"name": "device_layout", "properties": ["user_agent_device", "unit_layout"]}
+        {"name": "device_layout", "properties": ["user_agent_device", "unit_layout"]},
+        {"name": "synd", "properties": ["video_cpid"]},
+        {"name": "pub", "properties": ["unit_domain", "unit_pbid"]}
+      ]
+    },
+    {
+      "name": "syndicator_metrics",
+      "dimensions": [
+        "unit_environment",
+        "video_cpid"
+      ],
+      "filters": [
+        {"name": "geo", "properties": ["unit_domain", "ip_geo_info.country"]},
+        {"name": "device_layout", "properties": ["unit_domain", "user_agent_device", "unit_layout"]},
+        {"name": "publisher", "properties": ["unit_domain", "unit_pbid"]}
       ]
     }
   ],
