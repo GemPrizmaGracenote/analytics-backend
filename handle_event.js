@@ -57,7 +57,7 @@ exports.handler = function(event, context) {
   Promise.all(writes.map(function(write) {
     return docClient.updateAsync(write);
   })).then(context.succeed.bind(context), function(error) {
-    console.error(error.message);
+    console.log(error.message);
     context.fail(error.message);
-  }).catch(context.fail);
+  });
 }

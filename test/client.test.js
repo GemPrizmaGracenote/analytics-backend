@@ -12,27 +12,28 @@ describe('parseTimeframe', function() {
   });
 });
 
+var config = {
+  "breakdowns": [
+    {"name": "video_performance", "dimensions": ["video_id", "unit_domain"]},
+    {
+      "name": "publisher_metrics",
+      "dimensions": [
+        "unit_environment",
+        "unit_pbid",
+        "unit_domain"
+      ],
+      "filters": [
+        {"name": "geo", "properties": ["ip_geo_info.country"]},
+        {"name": "device_layout", "properties": ["user_agent_device", "unit_layout"]}
+      ]
+    }
+  ],
+  "extra_aggregations": [
+    {"property": "unit_video_list.length", "name": "total_impressions"}
+  ]
+};
+
 describe('findSource', function() {
-  var config = {
-    "breakdowns": [
-      {"name": "video_performance", "dimensions": ["video_id", "unit_domain"]},
-      {
-        "name": "publisher_metrics",
-        "dimensions": [
-          "unit_environment",
-          "unit_pbid",
-          "unit_domain"
-        ],
-        "filters": [
-          {"name": "geo", "properties": ["ip_geo_info.country"]},
-          {"name": "device_layout", "properties": ["user_agent_device", "unit_layout"]}
-        ]
-      }
-    ],
-    "extra_aggregations": [
-      {"property": "unit_video_list.length", "name": "total_impressions"}
-    ]
-  };
 
   it('should find a source where all eq filters match dimensions', function() {
     var queryFilters = [
@@ -150,5 +151,109 @@ describe('aggregate', function() {
       {'unit_domain': 'baz.com', 'result': 13}
     ]);
 
+  });
+});
+
+var TEST_ROWS_1 = [{
+  key: 'PRODUCTION|PB-1234|foo.com|UnitFirstLoad_geo_count',
+  timestamp: 1447671600000,
+  'US': 5,
+  'DE': 7
+}, {
+  key: 'PRODUCTION|PB-1234|foo.com|UnitFirstLoad_geo_count',
+  timestamp: 1447675200000,
+  'US': 9,
+  'DE': 7
+}];
+
+var TEST_ROWS_2 = [{
+  key: 'PRODUCTION|PB-234|foo.com|UnitFirstLoad_geo_count',
+  timestamp: 1447678800000,
+  'US': 2
+}];
+
+describe('IntervalQueryBuilder', function() {
+  it('should return results for hourly', function() {
+    var iqb = client.makeQueryBuilder(config, {
+      filters: [
+        {property_name: 'unit_environment', operator: 'eq', property_value: 'PRODUCTION'},
+        {property_name: 'unit_pbid', operator: 'eq', property_value: 'pb-1234'},
+        {property_name: 'unit_domain', operator: 'eq', property_value: 'foo.com'},
+        {property_name: 'ip_geo_info.country', operator: 'eq', property_value: 'US'},
+      ],
+      interval: 'hourly',
+      timeframe: 'this_24_hours',
+      eventCollection: 'UnitFirstLoad',
+      timezone: 'America/Los_Angeles'
+    });
+
+    iqb.addRows(TEST_ROWS_1);
+    iqb.addRows(TEST_ROWS_2);
+    assert.deepEqual(iqb.getResult(), {
+      result: [
+        {timeframe: {start: '2015-11-16T11:00:00.000Z', end: '2015-11-16T12:00:00.000Z'}, value: 5},
+        {timeframe: {start: '2015-11-16T12:00:00.000Z', end: '2015-11-16T13:00:00.000Z'}, value: 9},
+        {timeframe: {start: '2015-11-16T13:00:00.000Z', end: '2015-11-16T14:00:00.000Z'}, value: 2}
+      ]
+    });
+  });
+  it('should return results for daily', function() {
+    var iqb = client.makeQueryBuilder(config, {
+      filters: [
+        {property_name: 'unit_environment', operator: 'eq', property_value: 'PRODUCTION'},
+        {property_name: 'unit_pbid', operator: 'eq', property_value: 'pb-1234'},
+        {property_name: 'unit_domain', operator: 'eq', property_value: 'foo.com'},
+        {property_name: 'ip_geo_info.country', operator: 'eq', property_value: 'US'},
+      ],
+      interval: 'daily',
+      timeframe: 'this_24_hours',
+      eventCollection: 'UnitFirstLoad',
+      timezone: 'America/Los_Angeles'
+    });
+
+    iqb.addRows(TEST_ROWS_1);
+    iqb.addRows(TEST_ROWS_2);
+    assert.deepEqual(iqb.getResult(), {
+      result: [
+        {timeframe: {start: '2015-11-16T00:00:00.000Z', end: '2015-11-17T00:00:00.000Z'}, value: 16}
+      ]
+    });
+  })
+});
+
+describe('SingleValueQueryBuilder', function() {
+  it('should return results', function() {
+    var iqb = client.makeQueryBuilder(config, {
+      filters: [
+        {property_name: 'unit_environment', operator: 'eq', property_value: 'PRODUCTION'},
+        {property_name: 'unit_pbid', operator: 'eq', property_value: 'pb-1234'},
+        {property_name: 'unit_domain', operator: 'eq', property_value: 'foo.com'},
+        {property_name: 'ip_geo_info.country', operator: 'eq', property_value: 'US'},
+      ],
+      timeframe: 'this_24_hours',
+      eventCollection: 'UnitFirstLoad',
+      timezone: 'America/Los_Angeles'
+    });
+
+    iqb.addRows([{
+      key: 'PRODUCTION|PB-1234|foo.com|UnitFirstLoad_geo_count',
+      timestamp: 1447671600000,
+      'US': 5,
+      'DE': 7
+    }, {
+      key: 'PRODUCTION|PB-1234|foo.com|UnitFirstLoad_geo_count',
+      timestamp: 1447675200000,
+      'US': 9,
+      'DE': 7
+    }]);
+    iqb.addRows([{
+      key: 'PRODUCTION|PB-234|foo.com|UnitFirstLoad_geo_count',
+      timestamp: 1447678800000,
+      'US': 2
+    }]);
+    assert.deepEqual(iqb.getResult(), {
+      result: 16
+    });
+    assert.equal(iqb.tableName, 'publisher_metrics_hourly');
   });
 });

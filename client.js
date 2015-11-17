@@ -13,10 +13,17 @@ Promise.promisifyAll(docClient);
 var KEY_DELIM = common.KEY_DELIM;
 var DEFAULT_PERIOD = common.DEFAULT_PERIOD;
 
-var INTERAVAL_SIZES = {
-  'hour': 60*60*1000,
-  'day': 24*60*60*1000,
-  'week': 7*24*60*60*1000,
+var INTERVAL_SIZES = {
+  'hourly': 60*60*1000,
+  'daily': 24*60*60*1000,
+  'weekly': 7*24*60*60*1000,
+};
+
+INTERVAL_TO_NOUN = {
+  'hourly': 'hour',
+  'daily': 'day',
+  'weekly': 'week',
+  'monthly': 'month'
 };
 
 function depluralize(str) {
@@ -197,58 +204,143 @@ function aggregate(item, groupBy, sourceFilterProperties) {
   }
 }
 
-exports.handler = function(query, context) {
-  var range = parseTimeframe(moment(), query.timeframe);
-  var groupBy = [];
-  if (_.isArray(query.groupBy)) {
-    groupBy = query.groupBy;
-  } else if (_.isString(query.groupBy)) {
-    groupBy = [query.groupBy];
+function BaseQueryBuilder(config, params) {
+  this.params = params;
+  if (_.isArray(params.groupBy)) {
+    this.groupBy = params.groupBy;
+  } else if (_.isString(params.groupBy)) {
+    this.groupBy = [params.groupBy];
+  } else {
+    this.groupBy = [];
   }
-  var source = findSource(config, query.filters, groupBy);
-  var queryFilters = query.filters || [];
-  var eventName = query.eventCollection;
-  if (!source.breakdown) {
-    return context.fail('A source for this request could not be found.');
+  var eventName = params.eventCollection;
+  this.source = findSource(config, params.filters, this.groupBy);
+
+  if (!this.source.breakdown) {
+    throw new Error('A source for this request could not be found.');
   }
-  var tableName = source.breakdown.name + '_' + common.DEFAULT_PERIOD.name;
-  var key = buildRowKeyFromFilters(source, queryFilters, eventName);
+
+  this.timezone = params.timezone || 'UTC';
+  this.range = parseTimeframe(moment(), params.timeframe, this.timezone);
+  this.tableName = this.source.breakdown.name + '_' + common.DEFAULT_PERIOD.name;
+  this.key = makeKey(this.source, params.filters || [], eventName);
+}
+
+BaseQueryBuilder.prototype.filterAggregateSingleRow_ = function(row) {
+  var source = this.source;
   // The query filters that were used to match the row shouldn't also be used
   // to match the column.  We discard them here.
-  var unmatchedFilters = queryFilters.filter(function(filter) {
+  var unmatchedFilters = this.params.filters.filter(function(filter) {
     return !_.contains(source.breakdown.dimensions, filter.property_name);
   });
-  doQuery(tableName, key, range).then(function(data) {
-    var row = data.Items.reduce(function(prev, current) {
-      for (var key in current) {
-        if (key !== 'timestamp' && current.hasOwnProperty(key) && _.isNumber(current[key])) {
-          prev[key] = (_.isNumber(prev[key]) ? prev[key] : 0) + current[key]
-        }
+  var filtered = filter(row, unmatchedFilters, source.filter.properties);
+  return aggregate(filtered, this.groupBy, source.filter.properties);
+};
+
+function rollUpRows(prevRow, newRows) {
+  return newRows.reduce(function(prev, current) {
+    for (var key in current) {
+      if (!current.hasOwnProperty(key) || key === 'timestamp' || key === 'key') {
+        continue;
       }
-      return prev;
-    }, {});
+      if (_.isNumber(current[key])) {
+        prev[key] = (_.isNumber(prev[key]) ? prev[key] : 0) + current[key]
+      }
+    }
+    return prev;
+  }, prevRow)
+}
+
+function SingleValueQueryBuilder(config, params) {
+  BaseQueryBuilder.call(this, config, params);
+  this.row = {};
+}
+
+SingleValueQueryBuilder.prototype = _.create(BaseQueryBuilder.prototype);
+
+SingleValueQueryBuilder.prototype.addRows = function(rows) {
+  this.row = rollUpRows(this.row, rows);
+};
+
+SingleValueQueryBuilder.prototype.getResult = function() {
+  var value = this.filterAggregateSingleRow_(this.row);
+  return {
+    result: value
+  };
+}
+
+function IntervalQueryBuilder(config, params) {
+  BaseQueryBuilder.call(this, config, params);
+  this.interval = params.interval;
+  this.rows = {}
+}
+
+IntervalQueryBuilder.prototype = _.create(BaseQueryBuilder.prototype);
+
+IntervalQueryBuilder.prototype.addRows = function(rows) {
+  rows.forEach(function(row) {
+    var timeframe = this.intervalToNoun();
+    var bucket = row.timestamp - (row.timestamp % INTERVAL_SIZES[this.interval]);
+    this.rows[bucket] = this.rows[bucket] || {};
+    this.rows[bucket] = rollUpRows(this.rows[bucket], [row]);
+  }, this);
+};
+
+IntervalQueryBuilder.prototype.intervalToNoun = function() {
+  return INTERVAL_TO_NOUN[this.interval];
+}
+
+IntervalQueryBuilder.prototype.getResult = function() {
+  var values = _.map(this.rows, function(row, timestamp) {
+    var justValues = _.omit(row, ['key', 'timestamp']);
+    return {
+      timeframe: this.getTimeframeFromTimestamp_(parseInt(timestamp, 10)),
+      value: this.filterAggregateSingleRow_(justValues)
+    };
+  }, this);
+  var sorted = _.sortBy(values, 'timeframe.start');
+  return {result: sorted};
+}
+
+IntervalQueryBuilder.prototype.getTimeframeFromTimestamp_ = function(timestamp) {
+  var start = moment(timestamp);
+  var end = start.clone().add(1, this.intervalToNoun());
+  return {
+    start: start.toJSON(),
+    end: end.toJSON()
+  };
+};
+
+function makeQueryBuilder(config, query) {
+  if (query.interval) {
+    return new IntervalQueryBuilder(config, query);
+  } else {
+    return new SingleValueQueryBuilder(config, query);
+  }
+}
+
+exports.handler = function(query, context) {
+  try {
+    var queryBuilder = makeQueryBuilder(config, query)
+  } catch(e) {
+    return context.fail(e.message);
+  }
+  var tableName = queryBuilder.tableName;
+  var key = queryBuilder.key;
+  var range = queryBuilder.range;
+  doQuery(tableName, key, range).then(function(data) {
+    console.log('Got response, %d rows', data.Items.length)
+    queryBuilder.addRows(data.Items);
     if (data.LastEvaluatedKey) {
       return doQuery(tableName, key, range, data.LastEvaluatedKey);
-    } else {
-      return row;
     }
-  }).then(function(row) {
-    var filtered = filter(row, unmatchedFilters, source.filter.properties);
-    var result = aggregate(filtered, groupBy, source.filter.properties);
-    var outTimeframe = {
-      'start': moment(range[0]).toJSON()
-    };
-    if (range[1]) {
-      outTimeframe['end'] = moment(range[1]).toJSON();
-    }
-    return {
-      'timeframe': outTimeframe,
-      'result': result
-    };
+  }).then(function() {
+    return queryBuilder.getResult();
   }).then(context.succeed, context.fail);
 }
 
 exports.findSource = findSource;
 exports.parseTimeframe = parseTimeframe;
 exports.filter = filter;
+exports.makeQueryBuilder = makeQueryBuilder;
 exports.aggregate = aggregate;
