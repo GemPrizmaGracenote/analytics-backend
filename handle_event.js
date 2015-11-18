@@ -46,7 +46,7 @@ exports.handler = function(event, context) {
         return;
       }
       writes.push(colIncrementParams(breakdown, bucket, rowKey, colKey, 1));
-      config.extra_aggregations.forEach(function(agg) {
+      _.get(breakdown, 'extra_aggregations', []).forEach(function(agg) {
         var rowKey = common.buildRowKey(event, dimensions, filter.name, agg.name);
         var value = _.get(event, agg.property);
         if (rowKey && value) {

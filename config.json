@@ -1,6 +1,12 @@
 {
   "breakdowns": [
-    {"name": "video_performance", "dimensions": ["video_id", "unit_domain"]},
+    {
+      "name": "video_performance",
+      "dimensions": ["video_id", "unit_domain"],
+      "extra_aggregations": [
+        {"property": "unit_video_list.length", "name": "total_impressions"}
+      ]
+    },
     {
       "name": "publisher_metrics",
       "dimensions": [
@@ -53,8 +59,5 @@
         {"name": "publisher", "properties": ["unit_domain", "unit_pbid"]}
       ]
     }
-  ],
-  "extra_aggregations": [
-    {"property": "unit_video_list.length", "name": "total_impressions"}
   ]
 }
