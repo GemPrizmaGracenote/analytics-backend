@@ -28,10 +28,7 @@ function colIncrementParams(breakdown, timestamp, rowKey, colKey, incrAmt) {
   }
 }
 
-var NULL_FILTER = {
-  name: 'all',
-  properties: []
-}
+var NULL_FILTER = common.NULL_FILTER;
 
 exports.handler = function(event, context) {
   var timestamp = new Date().getTime();
@@ -39,7 +36,7 @@ exports.handler = function(event, context) {
   var writes = [];
   config.breakdowns.forEach(function(breakdown) {
     var dimensions = breakdown.dimensions.concat(['event_name']);
-    _.get(breakdown, 'filters', [NULL_FILTER]).forEach(function(filter) {
+    _.get(breakdown, 'filters', []).concat([common.NULL_FILTER]).forEach(function(filter) {
       var rowKey = common.buildRowKey(event, dimensions, filter.name, 'count');
       var colKey = common.buildColKey(event, filter.properties);
       if (!(rowKey && colKey)) {

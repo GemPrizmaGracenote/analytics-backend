@@ -1,4 +1,8 @@
-exports.KEY_DELIM = '|';
+var _ = require('lodash');
+
+var KEY_DELIM = '|';
+
+exports.KEY_DELIM = KEY_DELIM;
 
 exports.DEFAULT_PERIOD = {
   name: 'hourly',
