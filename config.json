@@ -27,6 +27,19 @@
       ]
     },
     {
+      "name": "publisher_metrics_global_by_device",
+      "dimensions": [
+        "unit_environment",
+        "user_agent_device"
+      ],
+      "filters": [
+        {"name": "geo", "properties": ["ip_geo_info.country"]},
+        {"name": "synd", "properties": ["video_cpid"]},
+        {"name": "pub", "properties": ["unit_domain", "unit_pbid"]},
+        {"name": "retention", "properties": ["video_progress_counter"]}
+      ]
+    },
+    {
       "name": "syndicator_metrics",
       "dimensions": [
         "unit_environment",
