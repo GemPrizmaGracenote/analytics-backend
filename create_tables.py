@@ -16,11 +16,14 @@ def main():
   config_file = file(CONFIG_FILENAME)
   config = json.load(config_file)
   for breakdown in config['breakdowns']:
-    maybe_create_table(breakdown, config['extra_aggregations'])
+    extra_aggs = breakdown.get('extra_aggregations', []) + config.get('extra_aggregations', [])
+    maybe_create_table(breakdown, extra_aggs)
 
-def maybe_create_table(breakdown, extra_aggs):
+def maybe_create_table(breakdown, extra_aggs=[]):
   table_name = '_'.join([breakdown['name'], TABLE_PERIOD])
-  rows_per_write = len(breakdown.get('filters', [])) + 1 + len(extra_aggs)
+  num_filters = 1 + len(breakdown.get('filters', []))
+  num_metrics = 1 + len(extra_aggs)
+  rows_per_write =  num_filters * num_metrics
   try:
     table.Table.create(table_name, schema=[
         HashKey('key'),
