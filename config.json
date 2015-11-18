@@ -36,6 +36,7 @@
         {"name": "geo", "properties": ["unit_pbid", "ip_geo_info.country"]},
         {"name": "device_layout", "properties": ["unit_pbid", "user_agent_device", "unit_layout"]},
         {"name": "retention", "properties": ["video_progress_counter"]},
+        {"name": "dev_ret", "properties": ["user_agent_device", "video_progress_counter"]},
         {"name": "publisher", "properties": ["unit_domain", "unit_pbid"]}
       ]
     }
