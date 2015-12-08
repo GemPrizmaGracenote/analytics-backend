@@ -223,7 +223,7 @@ function BaseQueryBuilder(config, params) {
   this.timezone = params.timezone || 'UTC';
   this.range = parseTimeframe(moment(), params.timeframe, this.timezone);
   this.tableName = this.source.breakdown.name + '_' + common.DEFAULT_PERIOD.name;
-  this.key = makeKey(this.source, params.filters || [], eventName);
+  this.key = buildRowKeyFromFilters(this.source, params.filters || [], eventName);
 }
 
 BaseQueryBuilder.prototype.filterAggregateSingleRow_ = function(row) {
