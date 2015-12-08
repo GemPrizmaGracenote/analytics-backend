@@ -328,6 +328,9 @@ exports.handler = function(query, context) {
   var tableName = queryBuilder.tableName;
   var key = queryBuilder.key;
   var range = queryBuilder.range;
+  console.log('Query: %j\nusing source %s and filter %s', query,
+              queryBuilder.source.breakdown.name, queryBuilder.source.filter.name);
+  console.log('Timeframe: %j', range);
   doQuery(tableName, key, range).then(function(data) {
     console.log('Got response, %d rows', data.Items.length)
     queryBuilder.addRows(data.Items);
