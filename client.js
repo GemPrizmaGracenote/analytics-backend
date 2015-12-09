@@ -167,13 +167,16 @@ function filter(item, queryFilters, sourceFilterProperties) {
     queryFilters.forEach(function(filter) {
       var colValue = decoded[filter.property_name]
       switch(filter.operator) {
+        // We're doing loose type checking here because column keys are
+        // strings, so filtering on property_value == 2 should match a column
+        // with value "2".
         case 'eq':
-          if (colValue !== filter.property_value) {
+          if (colValue != filter.property_value) {
             matches = false;
           }
           break;
         case 'ne':
-          if (colValue === filter.property_value) {
+          if (colValue == filter.property_value) {
             matches = false;
           }
           break;

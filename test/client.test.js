@@ -124,6 +124,17 @@ describe('filter', function() {
     assert.deepEqual(result, {'foo.com|bar': 5});
   });
 
+  it('should filter a row with an eq test on a number', function() {
+    var sourceFilters = ['unit_domain', 'video_id'];
+    var queryFilters = [
+      {property_name: 'unit_domain', operator: 'eq', property_value: 'foo.com'},
+      {property_name: 'video_id', operator: 'eq', property_value: 10}
+    ];
+    var item = {'foo.com|10': 5, 'baz.com|qux': 10};
+    var result = client.filter(item, queryFilters, sourceFilters);
+    assert.deepEqual(result, {'foo.com|10': 5});
+  });
+
   it('should filter a row with a ne test', function() {
     var sourceFilters = ['unit_domain', 'video_id'];
     var queryFilters = [
