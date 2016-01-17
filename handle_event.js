@@ -6,7 +6,9 @@ var common = require('./common');
 
 AWS.config.update({region: 'us-east-1'});
 var config = JSON.parse(fs.readFileSync('config.json'));
-var docClient = new AWS.DynamoDB.DocumentClient();
+var docClient = new AWS.DynamoDB.DocumentClient({
+  maxRetries: 0
+});
 Promise.promisifyAll(docClient);
 
 var KEY_DELIM = common.KEY_DELIM;
